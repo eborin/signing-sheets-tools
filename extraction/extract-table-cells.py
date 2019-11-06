@@ -126,30 +126,75 @@ def extract_table_cells(img,boxes_template_fn):
         img_bin = 255-img_bin 
 
         # Defining a kernel length
-        kernel_length = np.array(img).shape[1]//100
-        #print("kernel length =",kernel_length)
+        hori_kernel_length = np.array(img).shape[1]//100
+        vert_kernel_length = np.array(img).shape[0]//100
+        print("image shape =", np.array(img).shape)
+        print("Hori kernel length = {}, Vert kernel length = {}".format(hori_kernel_length, vert_kernel_length))
         # A verticle kernel of (1 X kernel_length), which will detect all the verticle lines from the image.
-        verticle_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
+        verticle_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, vert_kernel_length))
         # A horizontal kernel of (kernel_length X 1), which will help to detect all the horizontal line from the image.
-        hori_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
+        hori_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (hori_kernel_length, 1))
         # A kernel of (3 X 3) ones.
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
-        # Morphological operation to detect vertical lines from an image
         #img_temp11 = img_bin
         #img_temp11 = cv2.dilate(img_temp11, verticle_kernel, iterations=1)
         #img_temp11 = cv2.erode(img_temp11, verticle_kernel, iterations=1)
         img_temp1 = cv2.erode(img_bin, verticle_kernel, iterations=3)
-        verticle_lines_img = cv2.dilate(img_temp1, verticle_kernel, iterations=3)
+        vertical_lines_img = cv2.dilate(img_temp1, verticle_kernel, iterations=3)
+        vertical_lines_img = cv2.dilate(vertical_lines_img, np.ones((3,3), np.uint8))
+        cv2.imwrite("Vertical lines.jpg", vertical_lines_img)
         # Morphological operation to detect horizontal lines from an image
         img_temp2 = cv2.erode(img_bin, hori_kernel, iterations=3)
         horizontal_lines_img = cv2.dilate(img_temp2, hori_kernel, iterations=3)
+        horizontal_lines_img = cv2.dilate(horizontal_lines_img, np.ones((3,3), np.uint8))
+        cv2.imwrite("Horizontal lines.jpg", horizontal_lines_img)
+
+        # Clear headline
+        gray_vertical_lines = cv2.cvtColor(vertical_lines_img, cv2.COLOR_RGB2GRAY)
+        gray_horizontal_lines = cv2.cvtColor(horizontal_lines_img, cv2.COLOR_RGB2GRAY)
+        vertical_contours, tmp_hierarchy = cv2.findContours(gray_vertical_lines, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        horizontal_contours, tmp_hierarchy2 = cv2.findContours(gray_horizontal_lines, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        top_most_position = img.shape[0]
+        for cnt in vertical_contours:
+            contour_top_most_y = tuple(cnt[cnt[:,:,1].argmin()][0])[1]
+            if contour_top_most_y < top_most_position:
+                top_most_position = contour_top_most_y
+        for y in range(horizontal_lines_img.shape[1]):
+            for x in range(0, top_most_position):
+                for z in range(horizontal_lines_img.shape[2]):
+                    horizontal_lines_img[x, y, z] = 0
+
+        positions_matrix = []
+        blank = np.zeros(img.shape)
+        gray_horizontal_lines = cv2.cvtColor(horizontal_lines_img, cv2.COLOR_RGB2GRAY)
+        horizontal_edged = cv2.Canny(gray_horizontal_lines, 75, 200)
+        cv2.imwrite("test1.png", horizontal_edged)
+        horizontal_contours, horizontal_hierarchy = cv2.findContours(horizontal_edged, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in horizontal_contours:
+            cv2.drawContours(img, cnt, -1, (255, 0, 0), 1)
+
+        cv2.imwrite("test.png", img)
+
+        for cnt in horizontal_contours:
+            position_vector = []
+
+
+        img1 = cv2.drawContours(blank.copy(), vertical_contours, -1, (255, 255, 255), 3)
+        img2 = cv2.drawContours(blank.copy(), horizontal_contours, -1, (255, 255, 255), 3)
+        cv2.imwrite("img1.jpg", img1)
+        cv2.imwrite("img2.jpg", img2)
+
+        intersection = np.logical_and(img1, img2)
+        cv2.imwrite("OMEGA TEST.jpg", np.float32(intersection)*255)
 
         # Weighting parameters, this will decide the quantity of an image to be added to make a new image.
         alpha = 0.5
         beta = 1.0 - alpha
         # This function helps to add two image with specific weight parameter to get a third image as summation of two image.
-        img_final_bin = cv2.addWeighted(verticle_lines_img, alpha, horizontal_lines_img, beta, 0.0)
+        img_final_bin = cv2.addWeighted(vertical_lines_img, alpha, horizontal_lines_img, beta, 0.0)
+        cv2.imwrite("SEMIFINAL.png", img_final_bin*255)
+
         img_final_bin = cv2.erode(~img_final_bin, kernel, iterations=2)
         (thresh, img_final_bin) = cv2.threshold(img_final_bin, 128,255, cv2.THRESH_BINARY, cv2.THRESH_OTSU)
 
@@ -170,30 +215,36 @@ def extract_table_cells(img,boxes_template_fn):
         return cells
 
 def search_row_set(rs,yi,hi):
-    m = yi + hi/2
+    m1 = yi + hi/2
     for k, v in rs.items():
-        y, h = k
-        if m >= y and m <= y+h:
+        l = v[-1]
+        x, y, h = l[0], l[1], l[3]
+        m2 = y + h/2
+        if m1 >= y-h/2 and m1 <= y+(3*h/4): #and xi > x:
             return k
+        #y, h = k
+        #if m >= y and m <= y+h:
+        #    return k
     return None
 
 def group_by_row_and_sort_by_column(cells):
-        # Sort by y (tup[1])
-        cells.sort(key=lambda tup: tup[1])
-        row_sets = {}
-        for x,y,w,h in cells:
-                # Filter out small cells
-                k = search_row_set(row_sets,y,h)
-                if k == None:
-                        row_sets[(y,h)] = [(x,y,w,h)]
-                else:
-                        row_sets[k].append((x,y,w,h))
-        
-        #Sort sets by x
-        for k, v in row_sets.items():
-                v.sort(key=lambda tup: tup[0])
+    print("Number of cells: ", len(cells))
+    # Sort by y (tup[1])
+    cells.sort(key=lambda tup: tup[1])
+    row_sets = {}
+    for x,y,w,h in cells:
+            # Filter out small cells
+            k = search_row_set(row_sets,y,h)
+            if k == None:
+                    row_sets[(y,h)] = [(x,y,w,h)]
+            else:
+                    row_sets[k].append((x,y,w,h))
+    
+    #Sort sets by x
+    for k, v in row_sets.items():
+            v.sort(key=lambda tup: tup[0])
 
-        return row_sets
+    return row_sets
 
 def filter_out_cells(cells, min_w, min_h, max_w, max_h, wf):
         filtered_list = []
@@ -234,6 +285,7 @@ try:
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 gray = cv2.GaussianBlur(gray, (5, 5), 0)
                 edged = cv2.Canny(gray, 75, 200)
+                cv2.imwrite("TestCanny.jpg", edged)
                 cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 cnts = imutils.grab_contours(cnts)
                 cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:5]

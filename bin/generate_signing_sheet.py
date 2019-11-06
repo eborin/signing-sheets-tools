@@ -1,25 +1,3 @@
-#!/usr/bin/env python3 
-# ---------------------------------------------------------------------------- #
-#
-#  Copyright (c) 2019 Edson Borin <edson@ic.unicamp.br>
-#
-#  This file is part of the signing-sheets-tools toolset.
-# 
-#  The signing-sheets-tools toolset is free software: you can redistribute
-#  it and/or modify it under the terms of the GNU General Public
-#  License 3, as published by the Free Software Foundation.
-# 
-#  The signing-sheets-tools toolset is distributed in the hope that
-#  it will be useful, but WITHOUT ANY WARRANTY; without even the
-#  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-#  PURPOSE.  See the GNU General Public License for more details.
-# 
-#  You should have received a copy of the GNU General Public License
-#  along with the signing-sheets-tools toolset.
-#  If not, see <https://www.gnu.org/licenses/>.
-# 
-# ---------------------------------------------------------------------------- #
- 
 import argparse
 import os
 from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Spacer
@@ -28,14 +6,9 @@ from reportlab.lib import colors
 DEFAULT_HEADER_ROW_HEIGHT = 23
 
 def generate(inputFile, outputFile, curso, turma="A/B", raField=1, nameField=2, ordena="RA", nameFormat="abv", ignoreHeader=0, rowHeight=45):
-
-    ap = argparse.ArgumentParser()
-
-    args = vars(ap.parse_args())
-
     # Read RA, Nomes from input file and generate a list of tuples (RA, Nome, "")
     print("Lendo RA e nomes do arquivo \""+inputFile+"\"."+ \
-          " Campo RA = "+raField+". Campo nome = "+nameField+".")
+          " Campo RA = "+str(raField)+". Campo nome = "+str(nameField)+".")
     input_tuples = read_tuples(inputFile, raField, nameField, ignoreHeader)
 
     # Sort list
