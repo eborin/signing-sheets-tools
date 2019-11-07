@@ -12,7 +12,8 @@ class Dao:
 
 		cursor.execute(''' CREATE TABLE IF NOT EXISTS classes (
 				id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-				name TEXT NOT NULL UNIQUE
+				name TEXT NOT NULL UNIQUE,
+				absence_threshold REAL NOT NULL
 			) ''')
 
 		cursor.execute(''' CREATE TABLE IF NOT EXISTS forms (
@@ -21,7 +22,6 @@ class Dao:
 				form_date INTEGER NOT NULL,
 				FOREIGN KEY(class_id) REFERENCES classes(id)
 			) ''')
-
 
 		cursor.execute(''' CREATE TABLE IF NOT EXISTS students (
 				ra INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,7 @@ class Dao:
 		cursor = conn.cursor()
 
 		try:
-			cursor.execute(''' INSERT INTO classes (name) VALUES (?) ''', (className,))
+			cursor.execute(''' INSERT INTO classes (name, absence_threshold) VALUES (?,-1) ''', (className,))
 		except sqlite3.IntegrityError:
 			print("Error inserting class in the database. The class name should be unique.")
 			return None
@@ -70,22 +70,121 @@ class Dao:
 
 		classes = []
 		for result in cursor.fetchall():
-			classes.append(disciplineClass.DisciplineClass(result[0], result[1]))
+			classes.append(disciplineClass.DisciplineClass(result[0], result[1], result[2]))
 
 		conn.close()
 
 		return classes
 
-	def insertStudents(self, studentList):
-		pass
+	def insertStudents(self, raNameTuples):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		for raName in raNameTuples:
+			cursor.execute(''' INSERT INTO students (ra, name, signature_path) VALUES (?, ?, "") ''', raName)
+
+		conn.commit()
+		conn.close()
+
+	def findAllStudents(self):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		cursor.execute(''' SELECT * FROM students ''')
+
+		students = []
+		for result in cursor.fetchall():
+			students.append(student.Student(result[0], result[1], result[2]))
+
+		conn.close()
+
+		return students
 
 	def dropDatabase(self):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()
 
+		print("Dropping database tables")
 		cursor.execute(''' DROP TABLE classes ''')
 		cursor.execute(''' DROP TABLE forms ''')
 		cursor.execute(''' DROP TABLE students ''')
 		cursor.execute(''' DROP TABLE signatures ''')
 
+		conn.close()
+
+	def updateStudentSignatures(self, raSignatureList):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		for raSignature in raSignatureList:
+			cursor.execute(''' UPDATE students SET signature_path = ? WHERE ra = ? ''', (raSignature[1], raSignature[0]))
+
+		conn.commit()
+		conn.close()
+
+	def updateClassAbsenceThreshold(self, name, absenceThreshold):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		cursor.execute(''' UPDATE classes SET absence_threshold = ? WHERE name = ? ''', (absenceThreshold, name))
+
+		conn.commit()
+		conn.close()
+
+	def getClassAbsenceThreshold(self, name):
+		threshold = -1
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		cursor.execute(''' SELECT * FROM classes WHERE name = ? ''', (name,))
+
+		resultList = cursor.fetchall()
+		if len(resultList) > 0:
+			threshold = resultList[0][2]
+
+		conn.close()
+
+		return threshold
+
+	def getClassByName(self, name):
+		queriedClass = None
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		cursor.execute(''' SELECT * FROM classes WHERE name = ? ''', (name,))
+
+		resultList = cursor.fetchall()
+		if len(resultList) > 0:
+			queriedClass = disciplineClass.DisciplineClass(resultList[0][0], resultList[0][1], resultList[0][2])
+
+		conn.close()
+
+		return queriedClass
+
+	def insertForm(self, classId, date):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+		
+		cursor.execute(''' INSERT INTO forms (class_id, form_date) VALUES (?, ?) ''', (classId, date))
+
+		formId = cursor.lastrowid
+
+		conn.commit()
+		conn.close()
+
+		return formId
+
+	def insertStudentsPresence(self, formId, studentsPresenceTuples):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		for raPresence in studentsPresenceTuples:
+			if raPresence[1]:
+				present = 1
+			else:
+				present = 0
+			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present) VALUES (?, ?, ?) ''',
+				(formId, raPresence[0], present))
+
+		conn.commit()
 		conn.close()
