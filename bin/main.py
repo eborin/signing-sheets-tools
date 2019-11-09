@@ -4,12 +4,17 @@ import generate_signing_sheet as gss
 import extract_table_cells as etc
 import matplotlib.pyplot as plt
 import numpy as np
+import validate_signatures as vs
 import pytesseract
 import cv2
 from os import path
 from classes import student
 from PIL import Image
 from classes.dao import Dao
+
+STUDENT_RA = 0
+CROPPED_SIGNATURE_PATH = 1
+BASE_SIGNATURE_PATH = 2
 
 def main():
 	commands = {'create-class': createClass, 'insert-auth-form': insertAuthForm, 'add-form': addForm, 'statistics': statistics, 'classes': printClasses,
@@ -156,6 +161,7 @@ def addForm():
 		row = row + 1
 
 	raPresenceTuples = []
+	studentRaSignatures = dao.getBaseSignatures(studentRaSignatures)
 
 	classAbsenceThreshold = dao.getClassAbsenceThreshold(className)
 	if classAbsenceThreshold == -1:
@@ -164,10 +170,14 @@ def addForm():
 		classAbsenceThreshold = classAbsenceThreshold*0.6
 	for raSignature in studentRaSignatures:
 		studentPresent = False
-		rate = getImageBlackPixelRating(raSignature[1], raSignature[0], formDate)
+		rate = getImageBlackPixelRating(raSignature[CROPPED_SIGNATURE_PATH], raSignature[STUDENT_RA], formDate)
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
-		raPresenceTuples.append((raSignature[0], studentPresent))
+		try:
+			signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
+		except:
+			signatureVeracity = -1
+		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity))
 
 	dao.insertStudentsPresence(formId, raPresenceTuples)
 
@@ -237,10 +247,11 @@ def clearDatabase():
 def getImageBlackPixelRating(imagePath, ra=None, formDate="01/01/2019"):
 	signatureImage = cv2.imread(imagePath)
 	graySignature = cv2.cvtColor(signatureImage, cv2.COLOR_BGR2GRAY)
-	thresholdedSignature = cv2.adaptiveThreshold(graySignature,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,3,5)
-	rate = 1 - cv2.countNonZero(thresholdedSignature)/(thresholdedSignature.shape[0]*thresholdedSignature.shape[1])
-	print("RA: {}, Rate: {}".format(ra, rate))
-	#cv2.imwrite("test/{}_{}.png".format(formDate, ra), thresholdedSignature)
+	thresholdedSignature = cv2.adaptiveThreshold(graySignature,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,7,5)
+	denoisedSignature = cv2.medianBlur(thresholdedSignature, 3)
+	rate = 1 - cv2.countNonZero(denoisedSignature)/(denoisedSignature.shape[0]*denoisedSignature.shape[1])
+	#print("RA: {}, Rate: {}".format(ra, rate))
+	#cv2.imwrite("./testDir/{}_{}.png".format(formDate.replace("/", "-"), ra), denoisedSignature)
 	return rate
 
 main()

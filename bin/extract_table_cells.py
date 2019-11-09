@@ -226,14 +226,15 @@ def generate_img(row,col,img,base_dir,image):
 def removeMargins(image):
     horizontalKernel = np.uint8(np.array([[0,0,0],[1,1,1],[0,0,0]]))
 
-    eroded = cv2.erode(image, horizontalKernel, iterations=6)
-    restored = cv2.dilate(image, horizontalKernel, iterations=6)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = (255 - gray)
 
-    cleansed = 255 - ((255 - image) - (255 - restored))
+    eroded = cv2.erode(gray, horizontalKernel, iterations=20)
+    restored = cv2.dilate(eroded, horizontalKernel, iterations=20)
 
-    kernel = np.uint8([[1,1,1],[1,1,1],[1,1,1]])
-    #cleansed = cv2.dilate(cleansed, kernel, iterations=1)
-    return cleansed
+    cleansed = gray - restored
+
+    return (255 - cleansed)
 
 try:
         import imutils
