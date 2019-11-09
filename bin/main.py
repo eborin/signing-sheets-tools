@@ -2,6 +2,8 @@ import argparse
 import sys
 import generate_signing_sheet as gss
 import extract_table_cells as etc
+import matplotlib.pyplot as plt
+import numpy as np
 import pytesseract
 import cv2
 from os import path
@@ -79,8 +81,17 @@ def insertAuthForm():
 			signatureFilePath = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[1]).zfill(2))
 			if path.exists(raFilePath):
 				if path.exists(signatureFilePath):
-					ra = pytesseract.image_to_string(Image.open(raFilePath), lang="por")
-					studentRaSignatures.append((ra, signatureFilePath))
+					#ra = pytesseract.image_to_string(Image.open(raFilePath), lang="por", config='--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789')
+					#studentRaSignatures.append((ra, signatureFilePath))
+					raImage = Image.open(raFilePath)
+					width, height = raImage.size
+					crop_img = raImage.crop((width/50, height/3, 49*width/50, 2*height/3))
+					ocrResult = pytesseract.image_to_string(crop_img, lang="por", config='digits')
+					numberList = [int(s) for s in ocrResult.split() if s.isdigit()]
+					ra = next(iter(numberList), None)
+					#print("OCR result: {}".format(ra))
+					if ra is not None:
+						studentRaSignatures.append((ra, signatureFilePath))
 			else:
 				flag = False
 		row = row + 1		
@@ -121,18 +132,26 @@ def addForm():
 	studentRaSignatures = []
 
 	cellPrefix = "cells/{}-cell".format(formFilepath[:-4])
-	row = 2
+	row = 1
 	raSignatureColumns = [(1,3),(4,6)]
 	flag = True
 	while flag:
 		for columnIndexes in raSignatureColumns:
 			raFilePath = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[0]).zfill(2))
 			signatureFilePath = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[1]).zfill(2))
+			#print("Ra File Path: {}".format(raFilePath))
 			if path.exists(raFilePath):
 				if path.exists(signatureFilePath):
-					ra = pytesseract.image_to_string(Image.open(raFilePath), lang="por")
-					studentRaSignatures.append((ra, signatureFilePath))
-			else:
+					raImage = Image.open(raFilePath)
+					width, height = raImage.size
+					crop_img = raImage.crop((width/50, height/3, 49*width/50, 2*height/3))
+					ocrResult = pytesseract.image_to_string(crop_img, lang="por", config='digits')
+					numberList = [int(s) for s in ocrResult.split() if s.isdigit()]
+					ra = next(iter(numberList), None)
+					#print("OCR result: {}".format(ra))
+					if ra is not None:
+						studentRaSignatures.append((ra, signatureFilePath))
+			elif columnIndexes == (1,3):
 				flag = False
 		row = row + 1
 
@@ -140,12 +159,12 @@ def addForm():
 
 	classAbsenceThreshold = dao.getClassAbsenceThreshold(className)
 	if classAbsenceThreshold == -1:
-		classAbsenceThreshold = 0.3
+		classAbsenceThreshold = 0.01
 	else:
-		classAbsenceThreshold = classAbsenceThreshold*0.9
+		classAbsenceThreshold = classAbsenceThreshold*0.6
 	for raSignature in studentRaSignatures:
 		studentPresent = False
-		rate = getImageBlackPixelRating(raSignature[1], raSignature[0])
+		rate = getImageBlackPixelRating(raSignature[1], raSignature[0], formDate)
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
 		raPresenceTuples.append((raSignature[0], studentPresent))
@@ -154,9 +173,52 @@ def addForm():
 
 def statistics():
 	ap = argparse.ArgumentParser(description='Calculates the current presence statistics of a class.')
-	ap.add_argument('-n', '--class-name', required=True, help='Class name')
+	ap.add_argument('-n', '--class_name', required=True, help='Class name')
 
 	args = vars(ap.parse_args(sys.argv[2:]))
+
+	className = args["class_name"]
+
+	dao = Dao()
+	queriedClass = dao.getClassByName(className)
+	if queriedClass is None:
+		print("No class with that name exists. Exiting.")
+		exit(1)
+
+	formsFromClass = dao.getFormsFromClass(queriedClass.id)
+	signatures = dao.getSignaturesFromForms(formsFromClass)
+
+	studentPresenceDict = {}
+	for signature in signatures:
+		studentPresenceDict[signature.studentRa] = studentPresenceDict.get(signature.studentRa, 0) + signature.present
+
+	formDict = {}
+	for form in formsFromClass:
+		formDict[form.date] = formDict.get(form.date, []) + [form]
+
+	numberOfClasses = len(formDict.keys())
+
+	generalFrequence = {}
+	for key, value in studentPresenceDict.items():
+		generalFrequence[key] = value/numberOfClasses
+
+	for key, value in generalFrequence.items():
+		print("{} frequence: {}".format(key, value))
+
+	histogram = {}
+	for i in studentPresenceDict.values():
+		histogram[i] = histogram.get(i,0) + 1
+
+	x = list(histogram.keys())
+	y = histogram.values()
+	plt.bar(x, y, color='#0504aa')
+	plt.xticks(np.arange(min(x), max(x)+1, 1.0))
+	plt.yticks(np.arange(min(y), max(y)+1, 2.0))
+	plt.xlabel('Número de presença em aulas')
+	plt.ylabel('Frequência')
+	plt.title('Frequência de alunos por número de presença aulas')
+	plt.grid(axis='y', alpha=0.25)
+	plt.show()
 
 def printClasses():
 	ap = argparse.ArgumentParser(description='Shows all of the stored classes.')
@@ -172,14 +234,13 @@ def clearDatabase():
 
 	dao.dropDatabase()
 
-def getImageBlackPixelRating(imagePath, ra=None):
+def getImageBlackPixelRating(imagePath, ra=None, formDate="01/01/2019"):
 	signatureImage = cv2.imread(imagePath)
 	graySignature = cv2.cvtColor(signatureImage, cv2.COLOR_BGR2GRAY)
 	thresholdedSignature = cv2.adaptiveThreshold(graySignature,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,3,5)
 	rate = 1 - cv2.countNonZero(thresholdedSignature)/(thresholdedSignature.shape[0]*thresholdedSignature.shape[1])
-	#print("RA: {}, Rate: {}".format(ra, rate))
-	#cv2.imwrite("test/{}.png".format(ra), thresholdedSignature)
+	print("RA: {}, Rate: {}".format(ra, rate))
+	#cv2.imwrite("test/{}_{}.png".format(formDate, ra), thresholdedSignature)
 	return rate
-
 
 main()

@@ -105,6 +105,8 @@ def generate(inputFile, outputFile, curso, turma="A/B", raField=1, nameField=2, 
     lst = [t1, Spacer(0,20), t2]
     print("Gravando resultado em \""+outputFile+"\".")
     SimpleDocTemplate(outputFile, showBoundary=0).build(lst)
+
+    return input_tuples
       
 def abrevia_nome(nome):
     nomes = nome.split()

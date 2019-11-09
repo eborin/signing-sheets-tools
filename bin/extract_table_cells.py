@@ -76,6 +76,7 @@ def extract(image, boxedImage=False, boxesTemplate=None, outputDir="./cells/", m
                 for x,y,w,h in l:
                         col += 1
                         new_img = img[y:y+h, x:x+w]
+                        new_img = removeMargins(new_img)
                         generate_img(row,col,new_img,output_dir,image)
                 if col in stats: stats[col] += 1
                 else: stats[col] = 1
@@ -222,7 +223,18 @@ def filter_out_cells(cells, min_w, min_h, max_w, max_h, wf):
 def generate_img(row,col,img,base_dir,image):
         cv2.imwrite(base_dir+image[:-4]+"-cell-"+"{0:0=2d}-".format(row)+"{0:0=2d}".format(col)+'.png', img)
 
-                        
+def removeMargins(image):
+    horizontalKernel = np.uint8(np.array([[0,0,0],[1,1,1],[0,0,0]]))
+
+    eroded = cv2.erode(image, horizontalKernel, iterations=6)
+    restored = cv2.dilate(image, horizontalKernel, iterations=6)
+
+    cleansed = 255 - ((255 - image) - (255 - restored))
+
+    kernel = np.uint8([[1,1,1],[1,1,1],[1,1,1]])
+    #cleansed = cv2.dilate(cleansed, kernel, iterations=1)
+    return cleansed
+
 try:
         import imutils
         

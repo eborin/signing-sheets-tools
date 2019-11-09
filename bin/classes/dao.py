@@ -188,3 +188,32 @@ class Dao:
 
 		conn.commit()
 		conn.close()
+
+	def getFormsFromClass(self, classId):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		cursor.execute(''' SELECT * FROM forms WHERE class_id = ? ''', (classId,))
+
+		forms = []
+		for result in cursor.fetchall():
+			forms.append(form.Form(result[0], result[1], result[2]))
+
+		conn.close()
+
+		return forms
+
+	def getSignaturesFromForms(self, forms):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		signatures = []
+		for form in forms:
+			cursor.execute(''' SELECT id, form_id, student_ra, present, veracity FROM signatures WHERE form_id = ? ''', (form.id,))
+
+			for result in cursor.fetchall():
+				signatures.append(signature.Signature(result[0], result[1], result[2], result[3], result[4]))
+
+		conn.close()
+
+		return signatures
