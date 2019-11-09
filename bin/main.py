@@ -2,12 +2,17 @@ import argparse
 import sys
 import generate_signing_sheet as gss
 import extract_table_cells as etc
+import validate_signatures as vs
 import pytesseract
 import cv2
 from os import path
 from classes import student
 from PIL import Image
 from classes.dao import Dao
+
+STUDENT_RA = 0
+CROPPED_SIGNATURE_PATH = 1
+BASE_SIGNATURE_PATH = 2
 
 def main():
 	commands = {'create-class': createClass, 'insert-auth-form': insertAuthForm, 'add-form': addForm, 'statistics': statistics, 'classes': printClasses,
@@ -137,6 +142,7 @@ def addForm():
 		row = row + 1
 
 	raPresenceTuples = []
+	studentRaSignatures = dao.getBaseSignatures(studentRaSignatures)
 
 	classAbsenceThreshold = dao.getClassAbsenceThreshold(className)
 	if classAbsenceThreshold == -1:
@@ -145,10 +151,11 @@ def addForm():
 		classAbsenceThreshold = classAbsenceThreshold*0.9
 	for raSignature in studentRaSignatures:
 		studentPresent = False
-		rate = getImageBlackPixelRating(raSignature[1], raSignature[0])
+		rate = getImageBlackPixelRating(raSignature[CROPPED_SIGNATURE_PATH], raSignature[STUDENT_RA])
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
-		raPresenceTuples.append((raSignature[0], studentPresent))
+		signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
+		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity))
 
 	dao.insertStudentsPresence(formId, raPresenceTuples)
 

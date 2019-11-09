@@ -34,7 +34,7 @@ class Dao:
 				form_id INTEGER NOT NULL,
 				student_ra INTEGER NOT NULL,
 				present INTEGER NOT NULL,
-				veracity REAL,
+				veracity INTEGER,
 				FOREIGN KEY(form_id) REFERENCES forms(id),
 				FOREIGN KEY(student_ra) REFERENCES students(ra)
 			) ''')
@@ -188,3 +188,19 @@ class Dao:
 
 		conn.commit()
 		conn.close()
+
+	def getBaseSignatures(self, studentRaSignatures):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		studentRaBaseSignature = []
+
+		for raSignatureTuple in studentRaSignatures:
+			cursor.execute(''' SELECT signature_path FROM students WHERE ra = ? ''', (raSignatureTuple[0],))
+			resultList = cursor.fetchall()
+			if len(resultList) > 0:
+				studentRaBaseSignature.append((raSignatureTuple[0], raSignatureTuple[1], resultList[0]))
+		
+		conn.close()
+
+		return studentRaBaseSignature
