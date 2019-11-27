@@ -173,13 +173,15 @@ def addForm():
 		rate = getImageBlackPixelRating(raSignature[CROPPED_SIGNATURE_PATH], raSignature[STUDENT_RA], formDate)
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
-		try:
-			signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
-		except:
+			try:
+				signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
+			except:
+				signatureVeracity = -1
+		else:
 			signatureVeracity = -1
 		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity))
 
-	dao.insertStudentsPresence(formId, raPresenceTuples)
+	dao.insertStudentsPresence(formId, raPresenceTuples, signatureVeracity)
 
 def statistics():
 	ap = argparse.ArgumentParser(description='Calculates the current presence statistics of a class.')

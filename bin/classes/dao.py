@@ -174,7 +174,7 @@ class Dao:
 
 		return formId
 
-	def insertStudentsPresence(self, formId, studentsPresenceTuples):
+	def insertStudentsPresence(self, formId, studentsPresenceTuples, signatureVeracity):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()
 
@@ -183,8 +183,8 @@ class Dao:
 				present = 1
 			else:
 				present = 0
-			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present) VALUES (?, ?, ?) ''',
-				(formId, raPresence[0], present))
+			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present, veracity) VALUES (?, ?, ?, ?) ''',
+				(formId, raPresence[0], present, signatureVeracity))
 
 		conn.commit()
 		conn.close()
