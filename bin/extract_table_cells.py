@@ -43,7 +43,7 @@ def extract(image, boxedImage=False, boxesTemplate=None, outputDir="./cells/", m
         img = cv2.imread(image)
 
         if norm1:
-                print("Normalizing image...") 
+                print("Normalizing image...")
                 img = normalize_img(img)
                 cv2.imwrite("NormalizedTable.jpg", img)
                 
@@ -68,6 +68,7 @@ def extract(image, boxedImage=False, boxesTemplate=None, outputDir="./cells/", m
         sorted_cells = group_by_row_and_sort_by_column(non_small_cells)
 
         print("Extracting cell images and output do directory:"+outputDir)
+        image_basename=image.replace('/','_')
         row = 0
         stats = {} # Map number of cols => Number of rows 
         for k, l in sorted_cells.items():
@@ -77,7 +78,7 @@ def extract(image, boxedImage=False, boxesTemplate=None, outputDir="./cells/", m
                         col += 1
                         new_img = img[y:y+h, x:x+w]
                         new_img = removeMargins(new_img)
-                        generate_img(row,col,new_img,output_dir,image)
+                        generate_img(row,col,new_img,output_dir,image_basename)
                 if col in stats: stats[col] += 1
                 else: stats[col] = 1
                 if col != 6: print("Warning: row",row,"has",col,"columns")
@@ -221,6 +222,8 @@ def filter_out_cells(cells, min_w, min_h, max_w, max_h, wf):
         return filtered_list
 
 def generate_img(row,col,img,base_dir,image):
+        #TODO: Verificar se o diretório base_dir/image..../ existe (tem situações onde a string image possui nome de diretórios)
+        #print("Generating img file:",base_dir+image[:-4]+"-cell-"+"{0:0=2d}-".format(row)+"{0:0=2d}".format(col)+'.png')
         cv2.imwrite(base_dir+image[:-4]+"-cell-"+"{0:0=2d}-".format(row)+"{0:0=2d}".format(col)+'.png', img)
 
 def removeMargins(image):

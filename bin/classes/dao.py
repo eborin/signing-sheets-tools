@@ -20,6 +20,7 @@ class Dao:
 				id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 				class_id INTEGER NOT NULL,
 				form_date INTEGER NOT NULL,
+				form_img BLOB NOT NULL,
 				FOREIGN KEY(class_id) REFERENCES classes(id)
 			) ''')
 
@@ -35,6 +36,7 @@ class Dao:
 				student_ra INTEGER NOT NULL,
 				present INTEGER NOT NULL,
 				veracity INTEGER,
+				sig_img BLOB NOT NULL,
 				FOREIGN KEY(form_id) REFERENCES forms(id),
 				FOREIGN KEY(student_ra) REFERENCES students(ra)
 			) ''')
@@ -161,11 +163,12 @@ class Dao:
 
 		return queriedClass
 
-	def insertForm(self, classId, date):
+	def insertForm(self, classId, date, form_img_path):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()
-		
-		cursor.execute(''' INSERT INTO forms (class_id, form_date) VALUES (?, ?) ''', (classId, date))
+		with open(form_img_path, "rb") as imageFile:
+			formImg = imageFile.read()
+		cursor.execute(''' INSERT INTO forms (class_id, form_date, form_img) VALUES (?, ?, ?) ''', (classId, date, formImg))
 
 		formId = cursor.lastrowid
 
@@ -173,18 +176,20 @@ class Dao:
 		conn.close()
 
 		return formId
-
+        
 	def insertStudentsPresence(self, formId, studentsPresenceTuples):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()
-
 		for raPresence in studentsPresenceTuples:
+			sig_img_path = raPresence[3]
+			with open(sig_img_path, "rb") as imageFile:
+				sig_blob = imageFile.read()
 			if raPresence[1]:
 				present = 1
 			else:
 				present = 0
-			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present) VALUES (?, ?, ?) ''',
-				(formId, raPresence[0], present))
+			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present, sig_img) VALUES (?, ?, ?, ?) ''',
+				(formId, raPresence[0], present, sig_blob))
 
 		conn.commit()
 		conn.close()
@@ -197,7 +202,7 @@ class Dao:
 
 		forms = []
 		for result in cursor.fetchall():
-			forms.append(form.Form(result[0], result[1], result[2]))
+			forms.append(form.Form(result[0], result[1], result[2], result[3]))
 
 		conn.close()
 
@@ -209,10 +214,11 @@ class Dao:
 
 		signatures = []
 		for form in forms:
-			cursor.execute(''' SELECT id, form_id, student_ra, present, veracity FROM signatures WHERE form_id = ? ''', (form.id,))
+			cursor.execute(''' SELECT id, form_id, student_ra, present, veracity, sig_img FROM signatures WHERE form_id = ? ''', (form.id,))
 
 			for result in cursor.fetchall():
-				signatures.append(signature.Signature(result[0], result[1], result[2], result[3], result[4]))
+				sig_img = result[5]                                 
+				signatures.append(signature.Signature(result[0], result[1], result[2], result[3], result[4], sig_img))
 
 		conn.close()
 

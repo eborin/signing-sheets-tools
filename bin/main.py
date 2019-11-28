@@ -16,6 +16,8 @@ STUDENT_RA = 0
 CROPPED_SIGNATURE_PATH = 1
 BASE_SIGNATURE_PATH = 2
 
+import pdb
+
 def main():
 	commands = {'create-class': createClass, 'insert-auth-form': insertAuthForm, 'add-form': addForm, 'statistics': statistics, 'classes': printClasses,
 	'clear': clearDatabase}
@@ -91,10 +93,10 @@ def insertAuthForm():
 					raImage = Image.open(raFilePath)
 					width, height = raImage.size
 					crop_img = raImage.crop((width/50, height/3, 49*width/50, 2*height/3))
-					ocrResult = pytesseract.image_to_string(crop_img, lang="por", config='digits')
+					ocrResult = pytesseract.image_to_string(crop_img, lang="eng", config='digits')
 					numberList = [int(s) for s in ocrResult.split() if s.isdigit()]
 					ra = next(iter(numberList), None)
-					#print("OCR result: {}".format(ra))
+					print("OCR result: {}".format(ra))
 					if ra is not None:
 						studentRaSignatures.append((ra, signatureFilePath))
 			else:
@@ -112,6 +114,8 @@ def insertAuthForm():
 	dao.updateClassAbsenceThreshold(args["class_name"], smallestRate)
 
 def addForm():
+
+        
 	ap = argparse.ArgumentParser(description='Add a new signed form to a class.')
 	ap.add_argument('-n', '--class_name', required=True, help='Class name')
 	ap.add_argument('-f', '--filepath', required=True, help='Filepath to the signed form image')
@@ -130,7 +134,7 @@ def addForm():
 		print("No class with that name exists. Exiting.")
 		exit(1)
 
-	formId = dao.insertForm(queriedClass.id, formDate)
+	formId = dao.insertForm(queriedClass.id, formDate, formFilepath)
 
 	etc.extract(formFilepath)
 
@@ -150,10 +154,13 @@ def addForm():
 					raImage = Image.open(raFilePath)
 					width, height = raImage.size
 					crop_img = raImage.crop((width/50, height/3, 49*width/50, 2*height/3))
-					ocrResult = pytesseract.image_to_string(crop_img, lang="por", config='digits')
+					#raImage.show()
+					#crop_img.show()
+					crop_img = raImage
+					ocrResult = pytesseract.image_to_string(crop_img, lang="eng", config='digits')
 					numberList = [int(s) for s in ocrResult.split() if s.isdigit()]
 					ra = next(iter(numberList), None)
-					#print("OCR result: {}".format(ra))
+					print("OCR result2: {}".format(ra))
 					if ra is not None:
 						studentRaSignatures.append((ra, signatureFilePath))
 			elif columnIndexes == (1,3):
@@ -177,8 +184,9 @@ def addForm():
 			signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
 		except:
 			signatureVeracity = -1
-		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity))
+		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity, raSignature[CROPPED_SIGNATURE_PATH]))
 
+	# TODO: Handle exceptions: try: except sqlite3.Error as error ...                
 	dao.insertStudentsPresence(formId, raPresenceTuples)
 
 def statistics():
@@ -197,15 +205,22 @@ def statistics():
 
 	formsFromClass = dao.getFormsFromClass(queriedClass.id)
 	signatures = dao.getSignaturesFromForms(formsFromClass)
-
 	studentPresenceDict = {}
+	studentSinaturesDict = {}
 	for signature in signatures:
 		studentPresenceDict[signature.studentRa] = studentPresenceDict.get(signature.studentRa, 0) + signature.present
-
+		studentSinaturesDict[signature.studentRa] = studentSinaturesDict.get(signature.studentRa, []) + [signature]
 	formDict = {}
+	formId2Date = {}
+	validDates = set()
 	for form in formsFromClass:
 		formDict[form.date] = formDict.get(form.date, []) + [form]
+		validDates.add(form.date)                
+		formId2Date[form.id] = form.date
 
+	generate_signatures_html(studentSinaturesDict, validDates, formId2Date)
+	generate_forms_html(formsFromClass)
+                
 	numberOfClasses = len(formDict.keys())
 
 	generalFrequence = {}
@@ -218,7 +233,7 @@ def statistics():
 	histogram = {}
 	for i in studentPresenceDict.values():
 		histogram[i] = histogram.get(i,0) + 1
-
+                        
 	x = list(histogram.keys())
 	y = histogram.values()
 	plt.bar(x, y, color='#0504aa')
@@ -253,5 +268,44 @@ def getImageBlackPixelRating(imagePath, ra=None, formDate="01/01/2019"):
 	#print("RA: {}, Rate: {}".format(ra, rate))
 	#cv2.imwrite("./testDir/{}_{}.png".format(formDate.replace("/", "-"), ra), denoisedSignature)
 	return rate
+
+def generate_forms_html(formsFromClass):
+	for form in formsFromClass:
+		print("Form: ",form.id)
+		with open("form-{}.png".format(form.id), 'wb') as fh:
+			fh.write(form.form_img)	                       
+                
+def generate_signatures_html(studentsSignatures, validDates, formId2Date):
+	sf = open("signatures.html","w") 
+	sf.write("<html>\n")
+	sf.write("<body>\n")
+	sf.write("  <h1>Signatures</h1>\n")
+	for ra, siglist in studentsSignatures.items():
+		basename="ra{}".format(ra)
+		sf.write("  <h2>RA: {}</h2>\n".format(ra))
+		sf.write("  <table border=\"1\">\n")
+		for date in validDates:
+			sf.write("    <tr>\n")
+			sf.write("      <td>{}</td>\n".format(date))
+			found = False
+			for sig in siglist:
+				formDate = formId2Date[sig.formId]
+				if formDate == date :
+					found = True
+					date_str = formDate.replace('/','_')
+					fname = basename + "-{}.png".format(date_str)                        
+					with open(fname, 'wb') as fh:
+						fh.write(sig.sig_img)
+					if sig.present == 1:	                
+						sf.write("      <td><img height=\"40\" src=\"{}\"/> | OK</td>\n".format(fname))
+					else:
+						sf.write("      <td><img height=\"40\" src=\"{}\"/> | <font color=\"red\">Faltou!</font></td>\n".format(fname))
+			if not found:
+				sf.write("      <td><font color=\"red\">Signature not found!</font></td>\n")
+			sf.write("    </tr>\n")
+		sf.write("  </table>\n")
+	sf.write("</body>\n")
+	sf.write("</html>\n")
+	sf.close()
 
 main()
