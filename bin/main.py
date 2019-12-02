@@ -202,7 +202,10 @@ def statistics():
 
 	studentPresenceDict = {}
 	for signature in signatures:
-		studentPresenceDict[signature.studentRa] = studentPresenceDict.get(signature.studentRa, 0) + signature.present
+		studentPresenceVeracity = studentPresenceDict.get(signature.studentRa, (0,0))
+		studentPresenceVeracity[0] = studentPresenceVeracity[0] + signature.present
+		studentPresenceVeracity[1] = studentPresenceVeracity[1] + signature.signatureVeracity
+		studentPresenceDict[signature.studentRa] = studentPresenceVeracity
 
 	formDict = {}
 	for form in formsFromClass:
@@ -212,14 +215,14 @@ def statistics():
 
 	generalFrequence = {}
 	for key, value in studentPresenceDict.items():
-		generalFrequence[key] = value/numberOfClasses
+		generalFrequence[key] = (value[0]/numberOfClasses, value[1]/numberOfClasses)
 
 	for key, value in generalFrequence.items():
-		print("{} frequence: {}".format(key, value))
+		print("{} frequence: {}, valid signatures: {}".format(key, value[0], value[1]))
 
 	histogram = {}
 	for i in studentPresenceDict.values():
-		histogram[i] = histogram.get(i,0) + 1
+		histogram[i[0]] = histogram.get(i,0) + 1
 
 	x = list(histogram.keys())
 	y = histogram.values()
