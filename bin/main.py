@@ -52,7 +52,7 @@ def createClass():
 
 	raNameTuples = gss.generate(args["filepath"], "form_{}.pdf".format(className), className)
 	raNameTuples = [(t[0], t[1][:-1]) for t in raNameTuples]
-	
+
 	dao.insertStudents(raNameTuples)
 
 def insertAuthForm():
@@ -99,7 +99,7 @@ def insertAuthForm():
 						studentRaSignatures.append((ra, signatureFilePath))
 			else:
 				flag = False
-		row = row + 1		
+		row = row + 1
 
 	smallestRate = 1
 	for raSignature in studentRaSignatures:
@@ -174,14 +174,14 @@ def addForm():
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
 			try:
-				signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
+				signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH][0], raSignature[CROPPED_SIGNATURE_PATH])
 			except:
 				signatureVeracity = -1
 		else:
 			signatureVeracity = -1
 		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity))
 
-	dao.insertStudentsPresence(formId, raPresenceTuples, signatureVeracity)
+	dao.insertStudentsPresence(formId, raPresenceTuples)
 
 def statistics():
 	ap = argparse.ArgumentParser(description='Calculates the current presence statistics of a class.')
@@ -203,8 +203,11 @@ def statistics():
 	studentPresenceDict = {}
 	for signature in signatures:
 		studentPresenceVeracity = studentPresenceDict.get(signature.studentRa, (0,0))
+		studentPresenceVeracity = list(studentPresenceVeracity)
 		studentPresenceVeracity[0] = studentPresenceVeracity[0] + signature.present
-		studentPresenceVeracity[1] = studentPresenceVeracity[1] + signature.signatureVeracity
+		if (signature.veracity != -1):
+			studentPresenceVeracity[1] = studentPresenceVeracity[1] + signature.veracity
+		studentPresenceVeracity = tuple(studentPresenceVeracity)
 		studentPresenceDict[signature.studentRa] = studentPresenceVeracity
 
 	formDict = {}
@@ -222,7 +225,7 @@ def statistics():
 
 	histogram = {}
 	for i in studentPresenceDict.values():
-		histogram[i[0]] = histogram.get(i,0) + 1
+		histogram[i[0]] = histogram.get(i[0],0) + 1
 
 	x = list(histogram.keys())
 	y = histogram.values()

@@ -164,7 +164,7 @@ class Dao:
 	def insertForm(self, classId, date):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()
-		
+
 		cursor.execute(''' INSERT INTO forms (class_id, form_date) VALUES (?, ?) ''', (classId, date))
 
 		formId = cursor.lastrowid
@@ -174,7 +174,7 @@ class Dao:
 
 		return formId
 
-	def insertStudentsPresence(self, formId, studentsPresenceTuples, signatureVeracity):
+	def insertStudentsPresence(self, formId, studentsPresenceTuples):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()
 
@@ -184,7 +184,7 @@ class Dao:
 			else:
 				present = 0
 			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present, veracity) VALUES (?, ?, ?, ?) ''',
-				(formId, raPresence[0], present, signatureVeracity))
+				(formId, raPresence[0], present, raPresence[2]))
 
 		conn.commit()
 		conn.close()
@@ -229,7 +229,7 @@ class Dao:
 			resultList = cursor.fetchall()
 			if len(resultList) > 0:
 				studentRaBaseSignature.append((raSignatureTuple[0], raSignatureTuple[1], resultList[0]))
-		
+
 		conn.close()
 
 		return studentRaBaseSignature
