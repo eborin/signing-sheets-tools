@@ -176,7 +176,6 @@ class Dao:
 		conn.close()
 
 		return formId
-        
 	def insertStudentsPresence(self, formId, studentsPresenceTuples):
 		conn = sqlite3.connect('database/database.db')
 		cursor = conn.cursor()

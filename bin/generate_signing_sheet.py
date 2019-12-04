@@ -34,7 +34,7 @@ def generate(inputFile, outputFile, curso, turma="A/B", raField=1, nameField=2, 
     elif nameFormat == "uma-linha":
         print("Um nome completo por linha")
         formata_nome = nome_completo
-    elif anameFormat == "multiplas-linhas":
+    elif nameFormat == "multiplas-linhas":
         print("Nomes longos serão quebrados em múltiplas linhas")
         formata_nome = gera_funcao_quebra_linha(20)
     else:

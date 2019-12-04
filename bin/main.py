@@ -180,9 +180,11 @@ def addForm():
 		rate = getImageBlackPixelRating(raSignature[CROPPED_SIGNATURE_PATH], raSignature[STUDENT_RA], formDate)
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
-		try:
-			signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
-		except:
+			try:
+				signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH], raSignature[CROPPED_SIGNATURE_PATH])
+			except:
+				signatureVeracity = -1
+		else:
 			signatureVeracity = -1
 		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity, raSignature[CROPPED_SIGNATURE_PATH]))
 
@@ -275,11 +277,13 @@ def generate_forms_html(formsFromClass):
 		with open("form-{}.png".format(form.id), 'wb') as fh:
 			fh.write(form.form_img)	                       
                 
-def generate_signatures_html(studentsSignatures, validDates, formId2Date):
+def generate_signatures_html(studentsSignatures, validDatesSet, formId2Date):
 	sf = open("signatures.html","w") 
 	sf.write("<html>\n")
 	sf.write("<body>\n")
 	sf.write("  <h1>Signatures</h1>\n")
+	validDates = list(validDatesSet)
+	validDates.sort()
 	for ra, siglist in studentsSignatures.items():
 		basename="ra{}".format(ra)
 		sf.write("  <h2>RA: {}</h2>\n".format(ra))
