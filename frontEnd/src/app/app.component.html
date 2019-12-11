@@ -1,0 +1,37 @@
+<p>Lista de Presença</p>
+<button type="button" class="btn btn-primary" (click)="loadLista()">Carregar Lista</button>
+<table class="table">
+  <thead>
+  <tr>
+    <th scope="col">ra</th>
+    <th scope="col">signature</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr *ngFor="let student of listaPresenca">
+    <td>{{student.ra}}</td>
+    <td>
+      <table class="table" style="min-width: 1000px !important;">
+        <thead>
+        <th scope="col">date</th>
+        <th scope="col">raImage</th>
+        <th scope="col">signatureImage</th>
+        <th scope="col">present</th>
+        <th scope="col">similar</th>
+        <th scope="col">checkoutValue</th>
+        </thead>
+        <tbody>
+        <tr *ngFor="let signature of student.signatures">
+          <td>{{signature.date}}</td>
+          <td><img src="http://127.0.0.1:5000/image?img={{signature.raImage}}"></td>
+          <td>{{signature.signatureImage}}</td>
+          <td>{{signature.present}}</td>
+          <td>{{signature.similar}}</td>
+          <td>{{signature.checkoutValue}}</td>
+        </tr>
+        </tbody>
+      </table>
+    </td>
+  </tr>
+  </tbody>
+</table>
