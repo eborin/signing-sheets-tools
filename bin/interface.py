@@ -2,6 +2,8 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.boxlayout import BoxLayout
 from classes.dao import Dao
+import csv
+import datetime
 
 KEY_DATE = "date"
 KEY_RA_IMAGE = "raImagePath"
@@ -39,6 +41,10 @@ CONST_CHECKOUT_ABSENT = 0
 CONST_CHECKOUT_PRESENT_NOT_SIMILAR = 1
 CONST_CHECKOUT_PRESENT_NOT_VERIFIED = 2
 CONST_CHECKOUT_PRESENT_SIMILAR = 3
+
+OUTPUT_CSV_FILENAME = 'checkout.csv'
+
+PRESENCE_MARKER = 'x'
 
 Builder.load_string('''
 
@@ -221,8 +227,38 @@ class MainFrame(BoxLayout):
         Dao().generateCheckout(checkoutDic)
 
     def generateCSV(self):
-        Dao().getCheckoutDictionary(self.className)
+        savedDict = Dao().getCheckoutDictionary(self.className)
+        classDates = set()
+        checkoutDict = {}
+        for raName, signatures in savedDict.items():
+            checkoutDict[raName] = {}
+            for signature in signatures:
+                classDates.add(signature[KEY_DATE])
+                if signature[KEY_CHECKOUT] == CONST_CHECKOUT_PRESENT_SIMILAR:
+                    checkoutDict[raName][signature[KEY_DATE]] = PRESENCE_MARKER
+                else:
+                    checkoutDict[raName][signature[KEY_DATE]] = ''
 
+        sortedClassDates = sorted(list(classDates), key=lambda x: datetime.datetime.strptime(x, '%d/%m/%Y'))
+        csvRows = []
+        header = ["RA", "Nome"]
+        header.extend(sortedClassDates)
+        csvRows.append(header)
+        for raName, presences in checkoutDict.items():
+            row = [raName[0], raName[1]]
+            for classDate in sortedClassDates:
+                if classDate not in presences:
+                    row.append('')
+                else:
+                    row.append(presences[classDate])
+            csvRows.append(row)
+
+        with open(OUTPUT_CSV_FILENAME, 'w', newline='') as file:
+            writer = csv.writer(file)
+            for row in csvRows:
+                writer.writerow(row)
+
+        print("Checkout file saved in {}".format(OUTPUT_CSV_FILENAME))
 
 class TableHeader(BoxLayout):
     pass

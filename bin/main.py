@@ -87,8 +87,6 @@ def insertAuthForm():
 			signatureFilePath = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[1]).zfill(2))
 			if path.exists(raFilePath):
 				if path.exists(signatureFilePath):
-					#ra = pytesseract.image_to_string(Image.open(raFilePath), lang="por", config='--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789')
-					#studentRaSignatures.append((ra, signatureFilePath))
 					raImage = Image.open(raFilePath)
 					width, height = raImage.size
 					crop_img = raImage.crop((width/50, height/3, 49*width/50, 2*height/3))
@@ -239,7 +237,6 @@ def statistics():
 	plt.grid(axis='y', alpha=0.25)
 	plt.show()
 
-	print("============ Checkout ============")
 	InterfaceApp(className).run()
 
 def printClasses():
@@ -262,8 +259,6 @@ def getImageBlackPixelRating(imagePath, ra=None, formDate="01/01/2019"):
 	thresholdedSignature = cv2.adaptiveThreshold(graySignature,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,7,5)
 	denoisedSignature = cv2.medianBlur(thresholdedSignature, 3)
 	rate = 1 - cv2.countNonZero(denoisedSignature)/(denoisedSignature.shape[0]*denoisedSignature.shape[1])
-	#print("RA: {}, Rate: {}".format(ra, rate))
-	#cv2.imwrite("./testDir/{}_{}.png".format(formDate.replace("/", "-"), ra), denoisedSignature)
 	return rate
 
 main()
