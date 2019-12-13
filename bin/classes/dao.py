@@ -33,8 +33,11 @@ class Dao:
 				id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 				form_id INTEGER NOT NULL,
 				student_ra INTEGER NOT NULL,
+				ra_image TEXT NOT NULL,
+				signature_image TEXT NOT NULL,
 				present INTEGER NOT NULL,
 				veracity INTEGER,
+				checkout INTEGER,
 				FOREIGN KEY(form_id) REFERENCES forms(id),
 				FOREIGN KEY(student_ra) REFERENCES students(ra)
 			) ''')
@@ -183,8 +186,9 @@ class Dao:
 				present = 1
 			else:
 				present = 0
-			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, present, veracity) VALUES (?, ?, ?, ?) ''',
-				(formId, raPresence[0], present, raPresence[2]))
+			cursor.execute(''' INSERT INTO signatures (form_id, student_ra, ra_image, signature_image, present, 
+			veracity) VALUES (?, ?, ?, ?, ?, ?) ''', (formId, raPresence[0], raPresence[3], raPresence[4], present,
+													  raPresence[2]))
 
 		conn.commit()
 		conn.close()
@@ -228,8 +232,109 @@ class Dao:
 			cursor.execute(''' SELECT signature_path FROM students WHERE ra = ? ''', (raSignatureTuple[0],))
 			resultList = cursor.fetchall()
 			if len(resultList) > 0:
-				studentRaBaseSignature.append((raSignatureTuple[0], raSignatureTuple[1], resultList[0]))
+				studentRaBaseSignature.append((raSignatureTuple[0], raSignatureTuple[1], raSignatureTuple[2], resultList[0]))
 
 		conn.close()
 
 		return studentRaBaseSignature
+
+	def getCheckoutDictionary(self, className):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+		checkoutDictionary = {}
+
+		cursor.execute(''' SELECT students.name, student_ra, form_date, ra_image, signature_image, present, veracity, 
+		checkout, signatures.id FROM (((SELECT forms.id, forms.form_date FROM forms JOIN (SELECT * FROM classes WHERE name=?)) AS F 
+		 INNER JOIN signatures on F.id = signatures.form_id) INNER JOIN students on student_ra = ra) ORDER BY student_ra; ''', (className,))
+
+		resultList = cursor.fetchall()
+		for result in resultList:
+			key = (result[1], result[0])
+			if key not in checkoutDictionary:
+				checkoutDictionary[key] = []
+			checkoutDictionary[key].append({"date": result[2], "raImagePath": result[3], "signatureImagePath": result[4],
+										   "present": result[5], "similar": result[6], "checkout": result[7], "signatureId": result[8]})
+
+		conn.close()
+
+		return checkoutDictionary
+
+	def switchPresence(self, signatureId):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+		presence = -1
+		newPresence = -1
+
+		cursor.execute(''' SELECT present FROM signatures WHERE id = ? ''', (signatureId,))
+
+		resultList = cursor.fetchall()
+		if len(resultList) > 0:
+			presence = resultList[0][0]
+
+		print("Old presence: {}".format(presence))
+
+		if presence == 0:
+			newPresence = 1
+		elif presence == 1:
+			newPresence = 0
+
+		cursor.execute(''' UPDATE signatures SET present = ? WHERE id = ? ''', (newPresence, signatureId))
+
+		conn.commit()
+		conn.close()
+		return newPresence
+
+	def switchSimilarity(self, signatureId):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+		similarity = -1
+		newSimilarity = -1
+
+		cursor.execute(''' SELECT veracity FROM signatures WHERE id = ? ''', (signatureId,))
+
+		resultList = cursor.fetchall()
+		if len(resultList) > 0:
+			similarity = resultList[0][0]
+
+		if similarity == 0:
+			newSimilarity = 1
+		elif similarity == 1:
+			newSimilarity = 0
+
+		cursor.execute(''' UPDATE signatures SET veracity = ? WHERE id = ? ''', (newSimilarity, signatureId))
+
+		conn.commit()
+		conn.close()
+		return newSimilarity
+
+	def switchCheckout(self, signatureId):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+		checkout = None
+
+		cursor.execute(''' SELECT checkout FROM signatures WHERE id = ? ''', (signatureId,))
+
+		resultList = cursor.fetchall()
+		if len(resultList) > 0:
+			checkout = resultList[0][0]
+
+		if checkout is None or checkout >= 3:
+			newCheckout = 0
+		else:
+			newCheckout = checkout+1
+
+		cursor.execute(''' UPDATE signatures SET checkout = ? WHERE id = ? ''', (newCheckout, signatureId))
+
+		conn.commit()
+		conn.close()
+		return newCheckout
+
+	def generateCheckout(self, dic):
+		conn = sqlite3.connect('database/database.db')
+		cursor = conn.cursor()
+
+		for signatureId, checkout in dic.items():
+			cursor.execute(''' UPDATE signatures SET checkout = ? WHERE id = ? ''', (checkout, signatureId))
+
+		conn.commit()
+		conn.close()

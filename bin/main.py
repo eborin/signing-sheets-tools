@@ -8,13 +8,14 @@ import validate_signatures as vs
 import pytesseract
 import cv2
 from os import path
-from classes import student
 from PIL import Image
 from classes.dao import Dao
+from interface import InterfaceApp
 
 STUDENT_RA = 0
-CROPPED_SIGNATURE_PATH = 1
-BASE_SIGNATURE_PATH = 2
+RA_PATH = 1
+SIGNATURE_PATH = 2
+BASE_SIGNATURE_PATH = 3
 
 def main():
 	commands = {'create-class': createClass, 'insert-auth-form': insertAuthForm, 'add-form': addForm, 'statistics': statistics, 'classes': printClasses,
@@ -143,19 +144,18 @@ def addForm():
 	while flag:
 		for columnIndexes in raSignatureColumns:
 			raFilePath = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[0]).zfill(2))
-			signatureFilePath = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[1]).zfill(2))
+			png__format = "{}-{}-{}.png".format(cellPrefix, str(row).zfill(2), str(columnIndexes[1]).zfill(2))
+			signatureFilePath = png__format
 			#print("Ra File Path: {}".format(raFilePath))
 			if path.exists(raFilePath):
 				if path.exists(signatureFilePath):
 					raImage = Image.open(raFilePath)
-					width, height = raImage.size
-					crop_img = raImage.crop((width/50, height/3, 49*width/50, 2*height/3))
-					ocrResult = pytesseract.image_to_string(crop_img, lang="por", config='digits')
+					ocrResult = pytesseract.image_to_string(raImage, lang="por", config='digits')
 					numberList = [int(s) for s in ocrResult.split() if s.isdigit()]
 					ra = next(iter(numberList), None)
 					#print("OCR result: {}".format(ra))
 					if ra is not None:
-						studentRaSignatures.append((ra, signatureFilePath))
+						studentRaSignatures.append((ra, raFilePath, signatureFilePath))
 			elif columnIndexes == (1,3):
 				flag = False
 		row = row + 1
@@ -170,16 +170,17 @@ def addForm():
 		classAbsenceThreshold = classAbsenceThreshold*0.6
 	for raSignature in studentRaSignatures:
 		studentPresent = False
-		rate = getImageBlackPixelRating(raSignature[CROPPED_SIGNATURE_PATH], raSignature[STUDENT_RA], formDate)
+		rate = getImageBlackPixelRating(raSignature[SIGNATURE_PATH], raSignature[STUDENT_RA], formDate)
 		if rate >= classAbsenceThreshold:
 			studentPresent = True
 			try:
-				signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH][0], raSignature[CROPPED_SIGNATURE_PATH])
+				signatureVeracity = vs.is_signature_equal(raSignature[BASE_SIGNATURE_PATH][0], raSignature[SIGNATURE_PATH])
 			except:
 				signatureVeracity = -1
 		else:
 			signatureVeracity = -1
-		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity))
+		raPresenceTuples.append((raSignature[STUDENT_RA], studentPresent, signatureVeracity, raSignature[RA_PATH],
+								 raSignature[SIGNATURE_PATH]))
 
 	dao.insertStudentsPresence(formId, raPresenceTuples)
 
@@ -237,6 +238,9 @@ def statistics():
 	plt.title('Frequência de alunos por número de presença aulas')
 	plt.grid(axis='y', alpha=0.25)
 	plt.show()
+
+	print("============ Checkout ============")
+	InterfaceApp(className).run()
 
 def printClasses():
 	ap = argparse.ArgumentParser(description='Shows all of the stored classes.')
